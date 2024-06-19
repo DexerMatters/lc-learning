@@ -1,5 +1,5 @@
 if true then {
-    λx:A.x x
+    (λx:A.x x) a
 } else {
-    λy:B.y y
+    (λy:B.y y) b
 }

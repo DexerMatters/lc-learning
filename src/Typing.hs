@@ -1,2 +1,1 @@
 module Typing where
-
