@@ -13,13 +13,19 @@ module Monads.EvalEnv(
     , putEnv
     , modifyEnv
     , throwOneError
+    , runEval
     ) where
-import Control.Monad.Except (ExceptT, MonadError (throwError))
-import Control.Monad.State (State, MonadState (get, put), MonadTrans (lift), modify)
+import Control.Monad.Except (ExceptT, MonadError (throwError), runExceptT)
+import Control.Monad.State (State, MonadState (get, put), MonadTrans (lift), modify, evalState)
 
 type FI = (Int, Int)
 
-data Ty = Si String | Prod Ty Ty | Abs Ty Ty deriving (Show, Eq)
+data Ty = Si String | Prod Ty Ty | Abs Ty Ty deriving Eq
+
+instance Show Ty where
+  show (Si s) = s
+  show (Prod t1 t2) = "(" ++ show t1 ++ "," ++ show t2 ++ ")"
+  show (Abs t1 t2)  = show t1 ++ "->" ++ show t2
 
 data EvalError = 
       UndefinedType     FI Ty
@@ -27,6 +33,7 @@ data EvalError =
     | UnboundVariable   FI String
     | UndefinedBehavior FI
     | EndOfEval
+    deriving Show
 
 data EvalEnv = EvalEnv {
     typeSigs :: [Ty],
@@ -71,3 +78,5 @@ putEnv env = modify $ \(a, b, _) -> (a, b, env)
 modifyEnv :: (EvalEnv -> EvalEnv) -> EvalState t ()
 modifyEnv f = getEnv >>= \env -> putEnv (f env)
 
+runEval :: [t] -> EvalState t a -> Either [EvalError] a
+runEval t s = evalState (runExceptT s) (t, [], defaultEnv)

@@ -3,6 +3,10 @@ module Typing where
 import Monads.EvalEnv (EvalState, check, modifyEnv, EvalEnv (..), EvalError (..), Ty(..), throwOneError, getEnv)
 import Lexing (FITerm, Term (TmLit, TmAbs, TmApp, TmVar, TmAs, TmIfElse), Ground (GBool, GInt), FI)
 import Control.Monad.Except (throwError)
+import Debug.Trace (trace)
+
+tr :: Show a => a -> a
+tr a = trace ("trace:" ++ show a) a
 
 putBinder :: (String, Ty) -> EvalState FITerm ()
 putBinder s = modifyEnv $

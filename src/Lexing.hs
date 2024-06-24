@@ -143,7 +143,7 @@ pAs = TmAs
     <*> (symbol ":" *> ptSig 0)
 
 pApp :: Parser Term
-pApp = unfi $ foldr1 fiApp <$> many ((pTerm 2 <|> pParen) <* space) where
+pApp = unfi $ foldl1 fiApp <$> many ((pTerm 2 <|> pParen) <* space) where
     fiApp ft1 ft2 = ((0, 0), TmApp ft1 ft2)
 
 pIfElse :: Parser Term

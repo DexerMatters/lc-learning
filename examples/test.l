@@ -1,1 +1,1 @@
-let i:Int -> Int -> (Bool, Bool) = 12 in i
+(λx:Int.λy:Bool.λz:Bool->Int.z) 12
