@@ -1,5 +1,1 @@
-if true then {
-    (λx:A.x x) a
-} else {
-    (λy:B.y y) b
-}
+let i:Int -> Int -> (Bool, Bool) = 12 in i

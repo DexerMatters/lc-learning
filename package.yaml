@@ -38,7 +38,6 @@ library:
   dependencies:
     - megaparsec
     - mtl
-    - text
 
 executables:
   lc-learning-exe:
@@ -52,7 +51,6 @@ executables:
     - lc-learning
     - megaparsec
     - mtl
-    - text
 
 tests:
   lc-learning-test:
