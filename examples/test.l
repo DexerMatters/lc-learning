@@ -1,1 +1,1 @@
-(λx:Int.λy:Bool.λz:Bool->Int.z) 12
+(λx:(Int, Int, Bool).x) (44, 33, false)

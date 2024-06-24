@@ -5,7 +5,7 @@ module Lexing(
     , FI
     , Ground(..)
     , Typing
-    , rev 
+    , rev
     , pVar
     , pAs
     , pLitBool
@@ -38,6 +38,7 @@ data Term =
     | TmAs      FITerm Ty
     | TmIfElse  FITerm FITerm FITerm
     | TmLetIn   String Ty FITerm FITerm
+    | TmProd    FITerm FITerm
 
     -- for type contexts
     | TmTyDef   String
@@ -163,9 +164,13 @@ pTyDef :: Parser Term
 pTyDef = TmTyDef <$> (symbol "::" *> ty)
 
 pSubDef :: Parser Term
-pSubDef = TmSubDef 
+pSubDef = TmSubDef
     <$> (symbol "::" *> ty <* symbol "<:")
     <*> ty
+
+pProd :: Parser Term
+pProd = unfi $ foldl1 fiProd <$> scope '(' ')' (sepBy1 (pTerm 0) (symbol ",")) where
+    fiProd ft1 ft2 = ((0, 0), TmProd ft1 ft2)
 
 pParen :: Parser FITerm
 pParen = scope '(' ')' . pTerm $ 0
@@ -187,6 +192,7 @@ pTerm i = choice . drop (i + 3) $
       , try pAs
 
         -- Atomics
+      , pProd
       , pAbs
       , pLitBool
       , pLitInt
@@ -194,7 +200,6 @@ pTerm i = choice . drop (i + 3) $
     ]
 
 lex :: Parser [FITerm]
-lex = 
-        do {_ <- eof; return []} 
+lex =
+        do {_ <- eof; return []}
     <|> do {p <- pTerm (-3); ps <- lex; return (p:ps)}
-    

@@ -1,7 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 module Typing where
 import Monads.EvalEnv (EvalState, check, modifyEnv, EvalEnv (..), EvalError (..), Ty(..), throwOneError, getEnv)
-import Lexing (FITerm, Term (TmLit, TmAbs, TmApp, TmVar, TmAs, TmIfElse), Ground (GBool, GInt), FI)
+import Lexing (FITerm, Term (TmLit, TmAbs, TmApp, TmVar, TmAs, TmIfElse, TmProd), Ground (GBool, GInt), FI)
 import Control.Monad.Except (throwError)
 import Debug.Trace (trace)
 
@@ -38,6 +38,8 @@ typeof' (fi, TmApp f p) = do
             else throwError [BadTyped fi pT' pT]
         _ -> throwError [BadTyped fi fT $ Si "Function Type"]
 
+typeof' (_, TmProd t1 t2) = Prod <$> typeof' t1 <*> typeof' t2
+
 typeof' (fi, TmIfElse t1 t2 t3) = do
     ty1 <- typeof' t1
     ty2 <- typeof' t2
@@ -48,7 +50,6 @@ typeof' (fi, TmIfElse t1 t2 t3) = do
         if   ty2 == ty3
         then return ty2
         else throwError [BadTyped fi ty2 ty3]
-
 
 typeof' (fi, TmAs t ty) = do
     tT <- typeof' t
