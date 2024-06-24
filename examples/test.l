@@ -1,1 +1,1 @@
-(λx:(Int, Int, Bool).x) (44, 33, false)
+λx.x

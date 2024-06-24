@@ -24,6 +24,8 @@ typeof' (_, TmLit (GBool _)) = return $ Si "Bool"
 
 typeof' (_, TmLit (GInt _))  = return $ Si "Int"
 
+typeof' (_, TmAbs "_" ty t) = Abs ty <$> typeof' t -- wildcard
+
 typeof' (_, TmAbs v ty t) = putBinder (v, ty) >> (Abs ty <$> typeof' t)
 
 typeof' (fi, TmVar s) = lookupBinder fi s
