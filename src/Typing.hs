@@ -1,6 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 module Typing where
-import Monads.EvalEnv (EvalState, check, modifyEnv, EvalEnv (..), EvalError (..), Ty(..), throwOneError, getEnv)
+import Monads.EvalEnv (EvalState, check, modifyEnv, EvalEnv (..), EvalError (..), Ty(..), getEnv)
 import Lexing (FITerm, Term (TmLit, TmAbs, TmApp, TmVar, TmAs, TmIfElse, TmProd), Ground (GBool, GInt), FI)
 import Control.Monad.Except (throwError)
 import Debug.Trace (trace)
