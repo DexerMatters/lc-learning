@@ -18,3 +18,4 @@ main = do
             >> print (runEval ast check)
             >> putStrLn "\n**Typeof as below"
             >> print (runEval ast typeof)
+        Left err -> print err
