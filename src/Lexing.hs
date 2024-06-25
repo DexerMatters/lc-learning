@@ -23,7 +23,7 @@ import Text.Megaparsec.Char (letterChar, alphaNumChar, space1, upperChar, digitC
 import qualified Text.Megaparsec.Char.Lexer as L
 import Control.Monad (liftM3, liftM4)
 import Prelude hiding (lex)
-import Monads.EvalEnv (Ty(..))
+import Utils.EvalEnv (Ty(..))
 
 type Parser = Parsec Void String
 type Typing = String

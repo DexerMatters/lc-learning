@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Monads.EvalEnv(
+module Utils.EvalEnv(
       EvalState
     , EvalEnv(..)
     , EvalError(..)
@@ -12,7 +12,6 @@ module Monads.EvalEnv(
     , getEnv
     , putEnv
     , modifyEnv
-    , throwOneError
     , runEval
     ) where
 import Control.Monad.Except (ExceptT, MonadError (throwError), runExceptT)
@@ -41,9 +40,6 @@ data EvalEnv = EvalEnv {
 }
 
 type EvalState t = ExceptT [EvalError] (State ([t], [t], EvalEnv))
-
-throwOneError :: EvalError -> EvalState t ()
-throwOneError = throwError . pure
 
 defaultEnv :: EvalEnv
 defaultEnv = EvalEnv 

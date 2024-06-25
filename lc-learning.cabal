@@ -28,8 +28,8 @@ library
       Eval
       Lexing
       Lib
-      Monads.EvalEnv
       Typing
+      Utils.EvalEnv
   other-modules:
       Paths_lc_learning
   autogen-modules:

@@ -3,7 +3,7 @@ import Text.Megaparsec (parse, parseTest)
 import Prelude
 import Lexing (lex)
 import Typing (typeof)
-import Monads.EvalEnv (runEval, check)
+import Utils.EvalEnv (runEval, check)
 
 path :: String
 path = "/home/dexer/Projects/Haskell/Projects/lc-learning/examples/test.l"
