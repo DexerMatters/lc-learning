@@ -135,7 +135,7 @@ pLitInt = TmLit . GInt . read <$> some digitChar
 pAbs :: Parser Term
 pAbs = liftM3 TmAbs
         (symbol "λ" *> var)
-        (return (Si "Unit") <|> (symbol ":" *> ptSig 0))
+        (symbol ":" *> ptSig 0)
         (symbol "." *> many newline *> pTerm 0)
 
 pAs :: Parser Term
@@ -156,7 +156,7 @@ pIfElse = liftM3 TmIfElse
 pLetIn :: Parser Term
 pLetIn = liftM4 TmLetIn
         (symbol "let"   *> var <* space)
-        (return (Si "Unit") <|> (symbol ":" *> ptSig 0))
+        (symbol ":" *> ptSig 0)
         (symbol "="     *> (pTerm 2 <|> pParen) <* space)
         (symbol "in"    *> pTerm 0)
 

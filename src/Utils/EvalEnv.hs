@@ -13,9 +13,13 @@ module Utils.EvalEnv(
     , putEnv
     , modifyEnv
     , runEval
+    , fromJust
     ) where
 import Control.Monad.Except (ExceptT, MonadError (throwError), runExceptT)
 import Control.Monad.State (State, MonadState (get, put), MonadTrans (lift), modify, evalState)
+import Data.Map (insert, Map)
+import Data.Graph (Graph)
+import Data.IntMap (IntMap, fromList)
 
 type FI = (Int, Int)
 
@@ -27,24 +31,33 @@ instance Show Ty where
   show (Abs t1 t2)  = show t1 ++ "->" ++ show t2
 
 data EvalError = 
-      UndefinedType     FI Ty
+      UndefinedType     FI String
     | BadTyped          FI Ty Ty
     | UnboundVariable   FI String
     | UndefinedBehavior FI
+
+    | InternalError
     | EndOfEval
     deriving Show
 
 data EvalEnv = EvalEnv {
-    typeSigs :: [Ty],
-    binders  :: [(String, Ty)]
+    typeSigs :: [String],
+    binders  :: [(String, Ty)],
+    subEdges :: [(Int, Int)],
+    subGraph :: Maybe Graph
 }
 
 type EvalState t = ExceptT [EvalError] (State ([t], [t], EvalEnv))
 
+fromJust :: Maybe a -> EvalState t a
+fromJust = maybe (throwError [InternalError]) return
+
 defaultEnv :: EvalEnv
 defaultEnv = EvalEnv 
-    [Si "Int", Si "Bool", Si "Top", Si "Bottom"]
+    ["Top", "Int", "Bool", "Bot"]
     []
+    [(0, 1), (1, 2), (2, 3)]
+    Nothing
 
 check :: EvalState t t
 check = lift get >>= \case 
@@ -55,7 +68,6 @@ next :: EvalState t t
 next = lift get >>= \case 
     (a:as, bs, e) -> put (as, a:bs, e) >> return a
     _ -> throwError [EndOfEval]
-
 
 pop :: EvalState t t
 pop = lift get >>= \case 

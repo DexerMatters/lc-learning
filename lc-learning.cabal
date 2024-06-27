@@ -25,11 +25,14 @@ source-repository head
 
 library
   exposed-modules:
+      Desugar
       Eval
       Lexing
       Lib
+      Subtyping
       Typing
       Utils.EvalEnv
+      Utils.SplitStream
   other-modules:
       Paths_lc_learning
   autogen-modules:
@@ -39,6 +42,7 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
+    , containers
     , megaparsec
     , mtl
   default-language: Haskell2010

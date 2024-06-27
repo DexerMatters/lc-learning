@@ -1,1 +1,1 @@
-λx.x
+λx:Int.λy:Bool.x

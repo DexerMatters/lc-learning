@@ -38,6 +38,7 @@ library:
   dependencies:
     - megaparsec
     - mtl
+    - containers
 
 executables:
   lc-learning-exe:

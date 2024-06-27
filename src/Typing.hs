@@ -1,5 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
-module Typing where
+{-# LANGUAGE RecordWildCards #-}
+module Typing(typeof) where
 import Utils.EvalEnv (EvalState, check, modifyEnv, EvalEnv (..), EvalError (..), Ty(..), getEnv)
 import Lexing (FITerm, Term (TmLit, TmAbs, TmApp, TmVar, TmAs, TmIfElse, TmProd), Ground (GBool, GInt), FI)
 import Control.Monad.Except (throwError)
@@ -10,7 +11,7 @@ tr a = trace ("trace:" ++ show a) a
 
 putBinder :: (String, Ty) -> EvalState FITerm ()
 putBinder s = modifyEnv $
-    \EvalEnv{binders, typeSigs} -> EvalEnv{binders = s:binders, typeSigs}
+    \EvalEnv{binders, ..} -> EvalEnv{binders = s:binders, ..}
 
 lookupBinder :: FI -> String -> EvalState FITerm Ty
 lookupBinder fi s = do
