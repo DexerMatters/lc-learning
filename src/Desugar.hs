@@ -1,6 +1,7 @@
 module Desugar(desugarProc) where
 import Lexing
 import Utils.EvalEnv
+import Control.Applicative (Alternative(many))
 
 desugarProc' :: FITerm -> EvalState FITerm FITerm
 desugarProc' (fi, TmAbs s ty t) = do
@@ -35,4 +36,4 @@ desugarProc' (fi, TmLetIn s ty t1 t2) = do
 desugarProc' t = pure t
 
 desugarProc :: EvalState FITerm ()
-desugarProc = pop >>= desugarProc' >>= push
+desugarProc = flow desugarProc'

@@ -1,15 +1,14 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
-module Typing(typeof, lookupType) where
-import Utils.EvalEnv (EvalState, check, modifyEnv, EvalEnv (..), EvalError (..), Ty(..), getEnv)
+module Typing(typeof, lookupType, resetBinder) where
+import Utils.EvalEnv (EvalState, check, modifyEnv, EvalEnv (..), EvalError (..), Ty(..), getEnv, next, refresh)
 import Lexing (FITerm, Term (..), Ground (GBool, GInt), FI)
 import Control.Monad.Except (throwError)
-import Debug.Trace (trace)
 import Data.List (elemIndex)
 import Subtyping (subs, notSubs)
+import Control.Monad.RWS (modify)
+import Control.Applicative (Alternative(many))
 
-tr :: Show a => a -> a
-tr a = trace ("trace:" ++ show a) a
 
 putBinder :: (String, Ty) -> EvalState FITerm ()
 putBinder s = modifyEnv $
@@ -21,6 +20,10 @@ lookupBinder fi s = do
     case lookup s binders of
         Just t  -> return t
         Nothing -> throwError [UnboundVariable fi s]
+
+resetBinder :: EvalState FITerm ()
+resetBinder = modifyEnv $ 
+    \EvalEnv{..} -> EvalEnv{binders = [], ..} 
 
 lookupType :: FI -> String -> EvalState FITerm Int
 lookupType fi s = do
@@ -79,5 +82,5 @@ typeof' (fi, TmAsC t ty) = do
 
 typeof' (fi, _) = throwError [UndefinedBehavior fi]
 
-typeof :: EvalState FITerm Ty
-typeof = check >>= typeof'
+typeof :: EvalState FITerm [Ty]
+typeof = many ((next >>= typeof') <* resetBinder) <* refresh

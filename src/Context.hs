@@ -1,7 +1,8 @@
 module Context(indexProc) where
 import Lexing (Term(TmAbs, TmAbsC, TmAs, TmAsC, TmApp, TmProd, TmIfElse), FITerm, TyTerm (..), FI)
-import Utils.EvalEnv (EvalState, pop, push, Ty (..))
+import Utils.EvalEnv (EvalState, pop, push, Ty (..), refresh, flow)
 import Typing (lookupType)
+import Control.Applicative (many)
 
 {-
 # Contexting:
@@ -51,4 +52,4 @@ indexProc' (fi, TmIfElse t1 t2 t3) = do
 indexProc' t = pure t
 
 indexProc :: EvalState FITerm ()
-indexProc = pop >>= indexProc' >>= push
+indexProc = flow indexProc'

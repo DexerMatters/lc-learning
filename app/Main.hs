@@ -1,5 +1,5 @@
 module Main (main) where
-import Text.Megaparsec (parse, parseTest)
+import Text.Megaparsec (parse)
 import Prelude
 import Lexing (lex)
 import Typing (typeof)

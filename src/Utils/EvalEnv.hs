@@ -16,11 +16,14 @@ module Utils.EvalEnv(
     , fromJust
     , trivalFI
     , push
+    , pipe
+    , flow
     ) where
 import Control.Monad.Except (ExceptT, MonadError (throwError), runExceptT)
 import Control.Monad.State (State, MonadState (get, put), MonadTrans (lift), modify, evalState)
 import Data.Graph (Graph)
 import Text.Printf (printf)
+import Control.Applicative (many)
 
 type FI = (Int, Int)
 
@@ -80,7 +83,13 @@ pop = lift get >>= \case
     _ -> throwError [EndOfEval]
 
 push :: t -> EvalState t ()
-push t = lift get >>= \(as, bs, e) -> put (t:as, bs, e)
+push t = lift get >>= \(as, bs, e) -> put (as, t:bs, e)
+
+pipe :: (t -> EvalState t t) -> EvalState t ()
+pipe t = pop >>= t >>= push
+
+flow :: (t -> EvalState t t) -> EvalState t ()
+flow = (>> refresh) . many . pipe
 
 refresh :: EvalState t ()
 refresh = modify $ \(a, b, e) -> (b, a, e)
