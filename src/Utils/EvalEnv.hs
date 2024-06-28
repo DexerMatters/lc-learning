@@ -14,25 +14,30 @@ module Utils.EvalEnv(
     , modifyEnv
     , runEval
     , fromJust
+    , trivalFI
+    , push
     ) where
 import Control.Monad.Except (ExceptT, MonadError (throwError), runExceptT)
 import Control.Monad.State (State, MonadState (get, put), MonadTrans (lift), modify, evalState)
-import Data.Map (insert, Map)
 import Data.Graph (Graph)
-import Data.IntMap (IntMap, fromList)
+import Text.Printf (printf)
 
 type FI = (Int, Int)
 
-data Ty = Si String | Prod Ty Ty | Abs Ty Ty deriving Eq
+data Ty = Si Int | Prod Ty Ty | Abs Ty Ty deriving Eq
+
+trivalFI :: FI
+trivalFI = (0, 0)
 
 instance Show Ty where
-  show (Si s) = s
+  show (Si i) = printf "#%d" i
   show (Prod t1 t2) = "(" ++ show t1 ++ "," ++ show t2 ++ ")"
   show (Abs t1 t2)  = show t1 ++ "->" ++ show t2
 
 data EvalError = 
       UndefinedType     FI String
     | BadTyped          FI Ty Ty
+    | BadTypedS         FI Ty String
     | UnboundVariable   FI String
     | UndefinedBehavior FI
 
@@ -73,6 +78,9 @@ pop :: EvalState t t
 pop = lift get >>= \case 
     (a:as, bs, e) -> put (as, bs, e) >> return a
     _ -> throwError [EndOfEval]
+
+push :: t -> EvalState t ()
+push t = lift get >>= \(as, bs, e) -> put (t:as, bs, e)
 
 refresh :: EvalState t ()
 refresh = modify $ \(a, b, e) -> (b, a, e)

@@ -1,12 +1,10 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE LambdaCase #-}
-module Subtyping where
-import Utils.EvalEnv
+module Subtyping(isSubOf, makeSubGraph, putSubEdge, subs, notSubs) where
+import Utils.EvalEnv hiding (fromJust)
 import Data.Graph (buildG, path)
-import Control.Monad
-import Data.List (elemIndex)
-import Data.Functor ((<&>))
+import Data.Maybe (fromJust)
 
 putSubEdge :: (Int, Int) -> EvalState t ()
 putSubEdge s = modifyEnv $
@@ -19,23 +17,32 @@ makeSubGraph = modifyEnv $
         , ..
     }
 
-isSubOf :: Ty -> Ty -> EvalState t Bool
-isSubOf a b | a == b = return True -- Invariance
+isSubOf :: EvalEnv -> Ty -> Ty -> Bool
+isSubOf _ a b | a == b = True -- Invariance
 
 -- For covariance of singletons
-isSubOf (Si a) (Si b) = do
-    sigs  <- getEnv <&> typeSigs
-    graph <- getEnv >>= fromJust . subGraph
-    ia    <- fromJust $ elemIndex a sigs
-    ib    <- fromJust $ elemIndex b sigs
-    return $ path graph ia ib
+isSubOf env (Si a) (Si b) = path (fromJust (subGraph env)) b a
 
-isSubOf (Abs a as) (Abs b bs) = liftM2 (&&)
-    (isSubOf b a)   -- Contravariance for parameter type
-    (isSubOf as bs) -- Covariance for return type
+isSubOf env (Abs a as) (Abs b bs) = (&&)
+    (isSubOf env b a)   -- Contravariance for parameter type
+    (isSubOf env as bs) -- Covariance for return type
 
-isSubOf (Prod a as) (Prod b bs) = liftM2 (&&)
-    (isSubOf a b)
-    (isSubOf as bs)
-    
-isSubOf _ _ = pure False
+isSubOf env (Prod a as) (Prod b bs) = (&&)
+    (isSubOf env a b)
+    (isSubOf env as bs)
+
+isSubOf _ _ _ = False
+
+subs :: Ty -> Ty -> EvalState t a -> EvalState t a -> EvalState t a
+subs t1 t2 e1 e2 = do
+    env <- getEnv
+    if   isSubOf env t1 t2
+    then e1
+    else e2
+
+notSubs :: Ty -> Ty -> EvalState t a -> EvalState t a -> EvalState t a
+notSubs t1 t2 e1 e2 = do
+    env <- getEnv
+    if   not $ isSubOf env t1 t2
+    then e1
+    else e2

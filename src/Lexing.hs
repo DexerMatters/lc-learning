@@ -5,6 +5,7 @@ module Lexing(
     , FI
     , Ground(..)
     , Typing
+    , TyTerm(..)
     , rev
     , pVar
     , pAs
@@ -23,7 +24,7 @@ import Text.Megaparsec.Char (letterChar, alphaNumChar, space1, upperChar, digitC
 import qualified Text.Megaparsec.Char.Lexer as L
 import Control.Monad (liftM3, liftM4)
 import Prelude hiding (lex)
-import Utils.EvalEnv (Ty(..))
+import Utils.EvalEnv (Ty)
 
 type Parser = Parsec Void String
 type Typing = String
@@ -31,19 +32,29 @@ type FI = (Int, Int)
 
 
 data Term =
-      TmAbs     String Ty FITerm
+      TmAbs     String TyTerm FITerm
     | TmVar     String
     | TmApp     FITerm FITerm
     | TmLit     Ground
-    | TmAs      FITerm Ty
+    | TmAs      FITerm TyTerm
     | TmIfElse  FITerm FITerm FITerm
-    | TmLetIn   String Ty FITerm FITerm
+    | TmLetIn   String TyTerm FITerm FITerm
     | TmProd    FITerm FITerm
+
+    -- for contexting
+    | TmAbsC    String Ty FITerm
+    | TmAsC     FITerm Ty 
 
     -- for type contexts
     | TmTyDef   String
     | TmSubDef  String String
 
+    deriving Show
+
+data TyTerm = 
+      TmAbsT  TyTerm TyTerm
+    | TmProdT TyTerm TyTerm
+    | TmSiT   String
     deriving Show
 
 type FITerm = (FI, Term)
@@ -104,19 +115,19 @@ unfi p = p >>= \(_, t) -> return t
 
 -- Implementions for type expression parsing
 
-ptParen :: Parser Ty
+ptParen :: Parser TyTerm
 ptParen = scope '(' ')' . ptSig $ 0
 
-ptAbs :: Parser Ty
-ptAbs = foldl1 Abs <$> sepBy1 (ptSig 1 <|> ptParen) (symbol "->")
+ptAbs :: Parser TyTerm
+ptAbs = foldl1 TmAbsT <$> sepBy1 (ptSig 1 <|> ptParen) (symbol "->")
 
-ptProd :: Parser Ty
-ptProd = scope '(' ')' $ foldl1 Prod <$> sepBy1 (ptSig 0) (symbol ",")
+ptProd :: Parser TyTerm
+ptProd = scope '(' ')' $ foldl1 TmProdT <$> sepBy1 (ptSig 0) (symbol ",")
 
-ptSi :: Parser Ty
-ptSi = Si <$> ty
+ptSi :: Parser TyTerm
+ptSi = TmSiT <$> ty
 
-ptSig :: Int -> Parser Ty
+ptSig :: Int -> Parser TyTerm
 ptSig i = choice . drop i $ [try ptAbs, ptProd, ptSi]
 
 -- Implementions for token parsing
@@ -158,7 +169,7 @@ pLetIn = liftM4 TmLetIn
         (symbol "let"   *> var <* space)
         (symbol ":" *> ptSig 0)
         (symbol "="     *> (pTerm 2 <|> pParen) <* space)
-        (symbol "in"    *> pTerm 0)
+        (symbol "in"    *> pTerm (-1))
 
 pTyDef :: Parser Term
 pTyDef = TmTyDef <$> (symbol "::" *> ty)

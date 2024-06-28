@@ -4,6 +4,9 @@ import Prelude
 import Lexing (lex)
 import Typing (typeof)
 import Utils.EvalEnv (runEval, check)
+import Context (indexProc)
+import Subtyping (makeSubGraph)
+import Desugar (desugarProc)
 
 path :: String
 path = "/home/dexer/Projects/Haskell/Projects/lc-learning/examples/test.l"
@@ -17,5 +20,10 @@ main = do
                putStrLn "\n**AST as below"
             >> print (runEval ast check)
             >> putStrLn "\n**Typeof as below"
-            >> print (runEval ast typeof)
+            >> print (runEval ast (
+                   desugarProc 
+                >> indexProc 
+                >> makeSubGraph 
+                >> typeof
+                ))
         Left err -> print err

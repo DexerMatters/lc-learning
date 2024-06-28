@@ -25,6 +25,7 @@ source-repository head
 
 library
   exposed-modules:
+      Context
       Desugar
       Eval
       Lexing
@@ -33,6 +34,7 @@ library
       Typing
       Utils.EvalEnv
       Utils.SplitStream
+      Utils.Tools
   other-modules:
       Paths_lc_learning
   autogen-modules:
