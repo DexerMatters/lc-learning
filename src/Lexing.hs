@@ -1,11 +1,12 @@
 module Lexing(
       Parser
     , Term(..)
+    , TyTerm(..)
+    , PtTerm(..)
     , FITerm
     , FI
     , Ground(..)
     , Typing
-    , TyTerm(..)
     , rev
     , pVar
     , pAs
@@ -19,7 +20,7 @@ module Lexing(
 
 import Data.Void
 import Text.Megaparsec hiding (State)
-import Text.Megaparsec.Char (letterChar, alphaNumChar, space1, upperChar, digitChar, spaceChar, space, newline)
+import Text.Megaparsec.Char (letterChar, alphaNumChar, space1, upperChar, digitChar, spaceChar, space, newline, char)
 
 import qualified Text.Megaparsec.Char.Lexer as L
 import Control.Monad (liftM3, liftM4)
@@ -32,18 +33,19 @@ type FI = (Int, Int)
 
 
 data Term =
-      TmAbs     String TyTerm FITerm
-    | TmVar     String
-    | TmApp     FITerm FITerm
-    | TmLit     Ground
-    | TmAs      FITerm TyTerm
-    | TmIfElse  FITerm FITerm FITerm
-    | TmLetIn   String TyTerm FITerm FITerm
-    | TmProd    FITerm FITerm
+      TmAbs     PtTerm TyTerm FITerm        -- :: λPattern Type Term
+    | TmVar     String                      -- :: VariableExpression
+    | TmApp     FITerm FITerm               -- :: Term Term
+    | TmLit     Ground                      -- :: LiteralExpression
+    | TmAs      FITerm TyTerm               -- :: Term : Type
+    | TmIfElse  FITerm FITerm FITerm        -- :: if Term then Term else Term
+    | TmLetIn   PtTerm TyTerm FITerm FITerm -- :: let λPattern : Type = Term in Term
+    | TmProd    FITerm FITerm               -- :: (Term, Term)
+    | TmProj    FITerm Int                  -- :: Term.Index
 
     -- for contexting
-    | TmAbsC    String Ty FITerm
-    | TmAsC     FITerm Ty 
+    | TmAbsC    PtTerm Ty FITerm
+    | TmAsC     FITerm Ty
 
     -- for type contexts
     | TmTyDef   String
@@ -51,10 +53,15 @@ data Term =
 
     deriving Show
 
-data TyTerm = 
+data TyTerm =
       TmAbsT  TyTerm TyTerm
     | TmProdT TyTerm TyTerm
     | TmSiT   String
+    deriving Show
+
+data PtTerm =
+      TmProdP PtTerm PtTerm
+    | TmSiP   String
     deriving Show
 
 type FITerm = (FI, Term)
@@ -84,7 +91,9 @@ symbol :: String -> Parser String
 symbol = L.symbol sc
 
 var :: Parser String
-var = lexeme $ (:) <$> letterChar <*> many alphaNumChar
+var = lexeme $ (:) 
+    <$> (letterChar <|> char '_') 
+    <*> many (alphaNumChar <|> char '_')
 
 ty :: Parser String
 ty = lexeme $ (:) <$> upperChar <*> many alphaNumChar
@@ -122,13 +131,24 @@ ptAbs :: Parser TyTerm
 ptAbs = foldl1 TmAbsT <$> sepBy1 (ptSig 1 <|> ptParen) (symbol "->")
 
 ptProd :: Parser TyTerm
-ptProd = scope '(' ')' $ foldl1 TmProdT <$> sepBy1 (ptSig 0) (symbol ",")
+ptProd = scope '(' ')' $ foldr1 TmProdT <$> sepBy1 (ptSig 0) (symbol ",")
 
 ptSi :: Parser TyTerm
 ptSi = TmSiT <$> ty
 
 ptSig :: Int -> Parser TyTerm
 ptSig i = choice . drop i $ [try ptAbs, ptProd, ptSi]
+
+-- Implementions for pattern expression parsing
+
+ppProd :: Parser PtTerm
+ppProd = scope '(' ')' $ foldr1 TmProdP <$> sepBy1 (ppSig 0) (symbol ",")
+
+ppSi :: Parser PtTerm
+ppSi = TmSiP <$> var
+
+ppSig :: Int -> Parser PtTerm
+ppSig i = choice . drop i $ [ppProd, ppSi]
 
 -- Implementions for token parsing
 
@@ -145,7 +165,7 @@ pLitInt = TmLit . GInt . read <$> some digitChar
 
 pAbs :: Parser Term
 pAbs = liftM3 TmAbs
-        (symbol "λ" *> var)
+        (symbol "λ" *> ppSig 0)
         (symbol ":" *> ptSig 0)
         (symbol "." *> many newline *> pTerm 0)
 
@@ -166,7 +186,7 @@ pIfElse = liftM3 TmIfElse
 
 pLetIn :: Parser Term
 pLetIn = liftM4 TmLetIn
-        (symbol "let"   *> var <* space)
+        (symbol "let"   *> ppSig 0 <* space)
         (symbol ":" *> ptSig 0)
         (symbol "="     *> (pTerm 2 <|> pParen) <* space)
         (symbol "in"    *> pTerm (-1))
@@ -180,8 +200,13 @@ pSubDef = TmSubDef
     <*> ty
 
 pProd :: Parser Term
-pProd = unfi $ foldl1 fiProd <$> scope '(' ')' (sepBy1 (pTerm 0) (symbol ",")) where
+pProd = unfi $ foldr1 fiProd <$> scope '(' ')' (sepBy1 (pTerm 0) (symbol ",")) where
     fiProd ft1 ft2 = ((0, 0), TmProd ft1 ft2)
+
+pProj :: Parser Term
+pProj = TmProj
+    <$> (pTerm 4 <|> pParen)
+    <*> scope '[' ']' (read <$> some digitChar)
 
 pParen :: Parser FITerm
 pParen = scope '(' ')' . pTerm $ 0
@@ -201,6 +226,7 @@ pTerm i = choice . drop (i + 3) $
         -- Operators
       , try pApp
       , try pAs
+      , try pProj
 
         -- Atomics
       , pProd

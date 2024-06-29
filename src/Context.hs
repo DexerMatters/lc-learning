@@ -1,8 +1,7 @@
 module Context(indexProc) where
-import Lexing (Term(TmAbs, TmAbsC, TmAs, TmAsC, TmApp, TmProd, TmIfElse), FITerm, TyTerm (..), FI)
-import Utils.EvalEnv (EvalState, pop, push, Ty (..), refresh, flow)
+import Lexing (Term(TmAbs, TmAbsC, TmAs, TmAsC, TmApp, TmProd, TmIfElse, TmProj), FITerm, TyTerm (..), FI)
+import Utils.EvalEnv (EvalState, Ty (..), flow)
 import Typing (lookupType)
-import Control.Applicative (many)
 
 {-
 # Contexting:
@@ -42,6 +41,10 @@ indexProc' (fi, TmProd t1 t2) = do
     t1' <- indexProc' t1
     t2' <- indexProc' t2
     return (fi, TmProd t1' t2')
+
+indexProc' (fi, TmProj t i) = do
+    t' <- indexProc' t
+    return (fi, TmProj t' i)
 
 indexProc' (fi, TmIfElse t1 t2 t3) = do
     t1' <- indexProc' t1

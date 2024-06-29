@@ -13,17 +13,18 @@ module Utils.EvalEnv(
     , putEnv
     , modifyEnv
     , runEval
-    , fromJust
     , trivalFI
     , push
     , pipe
     , flow
+    , isEmpty
     ) where
 import Control.Monad.Except (ExceptT, MonadError (throwError), runExceptT)
 import Control.Monad.State (State, MonadState (get, put), MonadTrans (lift), modify, evalState)
 import Data.Graph (Graph)
 import Text.Printf (printf)
-import Control.Applicative (many)
+import Data.Bool (bool)
+import Debug.Trace (trace)
 
 type FI = (Int, Int)
 
@@ -43,6 +44,8 @@ data EvalError =
     | BadTypedS         FI Ty String
     | UnboundVariable   FI String
     | UndefinedBehavior FI
+    | PatternBadMatched FI
+    | ProjOutOfBound    FI
 
     | InternalError
     | EndOfEval
@@ -57,8 +60,6 @@ data EvalEnv = EvalEnv {
 
 type EvalState t = ExceptT [EvalError] (State ([t], [t], EvalEnv))
 
-fromJust :: Maybe a -> EvalState t a
-fromJust = maybe (throwError [InternalError]) return
 
 defaultEnv :: EvalEnv
 defaultEnv = EvalEnv 
@@ -77,6 +78,9 @@ next = lift get >>= \case
     (a:as, bs, e) -> put (as, a:bs, e) >> return a
     _ -> throwError [EndOfEval]
 
+isEmpty :: EvalState t Bool
+isEmpty = lift get >>= \(a, _, _) -> return $ null a
+
 pop :: EvalState t t
 pop = lift get >>= \case 
     (a:as, bs, e) -> put (as, bs, e) >> return a
@@ -89,7 +93,8 @@ pipe :: (t -> EvalState t t) -> EvalState t ()
 pipe t = pop >>= t >>= push
 
 flow :: (t -> EvalState t t) -> EvalState t ()
-flow = (>> refresh) . many . pipe
+flow t = flow' t >> refresh where
+    flow' t' = do {pipe t; isEmpty >>= bool (flow' t') (return ())}
 
 refresh :: EvalState t ()
 refresh = modify $ \(a, b, e) -> (b, a, e)

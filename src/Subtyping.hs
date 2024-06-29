@@ -1,8 +1,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE LambdaCase #-}
+
 module Subtyping(isSubOf, makeSubGraph, putSubEdge, subs, notSubs) where
-import Utils.EvalEnv hiding (fromJust)
+import Utils.EvalEnv
 import Data.Graph (buildG, path)
 import Data.Maybe (fromJust)
 

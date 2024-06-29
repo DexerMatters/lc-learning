@@ -1,49 +1,24 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
-module Typing(typeof, lookupType, resetBinder) where
-import Utils.EvalEnv (EvalState, check, modifyEnv, EvalEnv (..), EvalError (..), Ty(..), getEnv, next, refresh)
-import Lexing (FITerm, Term (..), Ground (GBool, GInt), FI)
+{-# LANGUAGE LambdaCase #-}
+module Typing(typeof, lookupType, resetBinder, putBinders) where
+import Utils.EvalEnv (EvalState, modifyEnv, EvalEnv (..), EvalError (..), Ty(..), getEnv, next, refresh, isEmpty)
+import Lexing (FITerm, Term (..), Ground (GBool, GInt), FI, PtTerm (..))
 import Control.Monad.Except (throwError)
 import Data.List (elemIndex)
 import Subtyping (subs, notSubs)
-import Control.Monad.RWS (modify)
-import Control.Applicative (Alternative(many))
-
-
-putBinder :: (String, Ty) -> EvalState FITerm ()
-putBinder s = modifyEnv $
-    \EvalEnv{binders, ..} -> EvalEnv{binders = s:binders, ..}
-
-lookupBinder :: FI -> String -> EvalState FITerm Ty
-lookupBinder fi s = do
-    binders <- binders <$> getEnv
-    case lookup s binders of
-        Just t  -> return t
-        Nothing -> throwError [UnboundVariable fi s]
-
-resetBinder :: EvalState FITerm ()
-resetBinder = modifyEnv $ 
-    \EvalEnv{..} -> EvalEnv{binders = [], ..} 
-
-lookupType :: FI -> String -> EvalState FITerm Int
-lookupType fi s = do
-    tys <- typeSigs <$> getEnv
-    maybe 
-        (throwError [UndefinedType fi s])
-        return
-        (elemIndex s tys)
-
-returnSi :: FI -> String -> EvalState FITerm Ty
-returnSi fi s = Si <$> lookupType fi s
+import Data.Bool (bool)
+import Control.Monad (liftM2)
 
 typeof' :: FITerm -> EvalState FITerm Ty
 typeof' (fi, TmLit (GBool _)) = returnSi fi "Bool"
 
 typeof' (fi, TmLit (GInt _))  = returnSi fi "Int"
 
-typeof' (_, TmAbsC "_" ty t) = Abs ty <$> typeof' t -- wildcard
-
-typeof' (_, TmAbsC v ty t) = putBinder (v, ty) >> (Abs ty <$> typeof' t)
+typeof' (fi, TmAbsC v ty t) = 
+        dePattern fi v ty  
+    >>= putBinders 
+    >> (Abs ty <$> typeof' t)
 
 typeof' (fi, TmVar s) = lookupBinder fi s
 
@@ -58,6 +33,13 @@ typeof' (fi, TmApp f p) = do
         _ -> throwError [BadTypedS fi fT "Function Type"]
 
 typeof' (_, TmProd t1 t2) = Prod <$> typeof' t1 <*> typeof' t2
+
+typeof' (fi, TmProj t i) = typeof' t  >>= \case
+    p@(Prod _ _) -> maybe 
+        (throwError [ProjOutOfBound fi]) 
+        return 
+        (prodElemAt p i)
+    d -> throwError [BadTypedS fi d "Tuple Type"]
 
 typeof' (fi, TmIfElse t1 t2 t3) = do
     ty1 <- typeof' t1
@@ -83,4 +65,50 @@ typeof' (fi, TmAsC t ty) = do
 typeof' (fi, _) = throwError [UndefinedBehavior fi]
 
 typeof :: EvalState FITerm [Ty]
-typeof = many ((next >>= typeof') <* resetBinder) <* refresh
+typeof = (<* refresh) $ do 
+    isEmpty >>= bool 
+        (liftM2 (:) (next >>= typeof') typeof) 
+        (return []) 
+
+putBinders :: [(String, Ty)] -> EvalState FITerm ()
+putBinders s = modifyEnv $
+    \EvalEnv{binders, ..} -> EvalEnv{binders = s ++ binders, ..}
+
+dePattern :: FI -> PtTerm -> Ty -> EvalState FITerm [(String, Ty)]
+dePattern _ (TmSiP s) ty | s /= "_"  = return [(s, ty)]
+                         | otherwise = return []
+
+dePattern fi (TmProdP p1 p2) (Prod t1 t2) = 
+    liftM2 (++) (dePattern fi p1 t1) (dePattern fi p2 t2)
+
+dePattern fi _ _ = throwError [PatternBadMatched fi]
+
+lookupBinder :: FI -> String -> EvalState FITerm Ty
+lookupBinder fi s = do
+    binders <- binders <$> getEnv
+    case lookup s binders of
+        Just t  -> return t
+        Nothing -> throwError [UnboundVariable fi s]
+
+resetBinder :: EvalState FITerm ()
+resetBinder = modifyEnv $ 
+    \EvalEnv{..} -> EvalEnv{binders = [], ..} 
+
+lookupType :: FI -> String -> EvalState FITerm Int
+lookupType fi s = do
+    tys <- typeSigs <$> getEnv
+    maybe 
+        (throwError [UndefinedType fi s])
+        return
+        (elemIndex s tys)
+
+returnSi :: FI -> String -> EvalState FITerm Ty
+returnSi fi s = Si <$> lookupType fi s
+
+prodElemAt :: Ty -> Int -> Maybe Ty
+prodElemAt = aux 0 where
+    aux i ty p = case ty of
+        Prod e pr | i == p    -> Just e
+                  | otherwise -> aux (i + 1) pr p
+        t | i == p    -> Just t
+          | otherwise -> Nothing
