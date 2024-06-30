@@ -26,6 +26,7 @@ import qualified Text.Megaparsec.Char.Lexer as L
 import Control.Monad (liftM3, liftM4)
 import Prelude hiding (lex)
 import Utils.EvalEnv (Ty)
+import GHC.Arr (Array, listArray)
 
 type Parser = Parsec Void String
 type Typing = String
@@ -40,7 +41,7 @@ data Term =
     | TmAs      FITerm TyTerm               -- :: Term : Type
     | TmIfElse  FITerm FITerm FITerm        -- :: if Term then Term else Term
     | TmLetIn   PtTerm TyTerm FITerm FITerm -- :: let λPattern : Type = Term in Term
-    | TmProd    FITerm FITerm               -- :: (Term, Term)
+    | TmTuple   (Array Int FITerm)          -- :: (Term, Term)
     | TmProj    FITerm Int                  -- :: Term.Index
 
     -- for contexting
@@ -54,14 +55,14 @@ data Term =
     deriving Show
 
 data TyTerm =
-      TmAbsT  TyTerm TyTerm
-    | TmProdT TyTerm TyTerm
-    | TmSiT   String
+      TmAbsT   TyTerm TyTerm
+    | TmTupleT (Array Int TyTerm)
+    | TmSiT    String
     deriving Show
 
 data PtTerm =
-      TmProdP PtTerm PtTerm
-    | TmSiP   String
+      TmTupleP (Array Int PtTerm)
+    | TmSiP    String
     deriving Show
 
 type FITerm = (FI, Term)
@@ -130,25 +131,29 @@ ptParen = scope '(' ')' . ptSig $ 0
 ptAbs :: Parser TyTerm
 ptAbs = foldl1 TmAbsT <$> sepBy1 (ptSig 1 <|> ptParen) (symbol "->")
 
-ptProd :: Parser TyTerm
-ptProd = scope '(' ')' $ foldr1 TmProdT <$> sepBy1 (ptSig 0) (symbol ",")
+ptTuple :: Parser TyTerm
+ptTuple = do
+    arr <- scope '(' ')' (sepBy1 (ptSig 0) (symbol ","))
+    return $ TmTupleT $ listArray (0, length arr - 1) arr
 
 ptSi :: Parser TyTerm
 ptSi = TmSiT <$> ty
 
 ptSig :: Int -> Parser TyTerm
-ptSig i = choice . drop i $ [try ptAbs, ptProd, ptSi]
+ptSig i = choice . drop i $ [try ptAbs, ptTuple, ptSi]
 
 -- Implementions for pattern expression parsing
 
-ppProd :: Parser PtTerm
-ppProd = scope '(' ')' $ foldr1 TmProdP <$> sepBy1 (ppSig 0) (symbol ",")
+ppTuple :: Parser PtTerm
+ppTuple = do
+    arr <- scope '(' ')' (sepBy1 (ppSig 0) (symbol ","))
+    return $ TmTupleP $ listArray (0, length arr - 1) arr
 
 ppSi :: Parser PtTerm
 ppSi = TmSiP <$> var
 
 ppSig :: Int -> Parser PtTerm
-ppSig i = choice . drop i $ [ppProd, ppSi]
+ppSig i = choice . drop i $ [ppTuple, ppSi]
 
 -- Implementions for token parsing
 
@@ -199,9 +204,10 @@ pSubDef = TmSubDef
     <$> (symbol "::" *> ty <* symbol "<:")
     <*> ty
 
-pProd :: Parser Term
-pProd = unfi $ foldr1 fiProd <$> scope '(' ')' (sepBy1 (pTerm 0) (symbol ",")) where
-    fiProd ft1 ft2 = ((0, 0), TmProd ft1 ft2)
+pTuple :: Parser Term
+pTuple = do
+    arr <- scope '(' ')' (sepBy1 (pTerm 0) (symbol ","))
+    return $ TmTuple $ listArray (0, length arr - 1) arr
 
 pProj :: Parser Term
 pProj = TmProj
@@ -229,7 +235,7 @@ pTerm i = choice . drop (i + 3) $
       , try pProj
 
         -- Atomics
-      , pProd
+      , pTuple
       , pAbs
       , pLitBool
       , pLitInt

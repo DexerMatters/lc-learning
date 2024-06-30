@@ -16,10 +16,9 @@ desugarProc' (fi, TmApp t1 t2) = do
     t2' <- desugarProc' t2
     return (fi, TmApp t1' t2')
 
-desugarProc' (fi, TmProd t1 t2) = do
-    t1' <- desugarProc' t1
-    t2' <- desugarProc' t2
-    return (fi, TmProd t1' t2')
+desugarProc' (fi, TmTuple arr) = do
+    arr' <- desugarProc' `mapM` arr
+    return (fi, TmTuple arr')
 
 desugarProc' (fi, TmIfElse t1 t2 t3) = do
     t1' <- desugarProc' t1

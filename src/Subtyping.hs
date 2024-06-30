@@ -5,6 +5,7 @@ module Subtyping(isSubOf, makeSubGraph, putSubEdge, subs, notSubs) where
 import Utils.EvalEnv
 import Data.Graph (buildG, path)
 import Data.Maybe (fromJust)
+import GHC.Arr (indices, (!))
 
 putSubEdge :: (Int, Int) -> EvalState t ()
 putSubEdge s = modifyEnv $
@@ -27,9 +28,12 @@ isSubOf env (Abs a as) (Abs b bs) = (&&)
     (isSubOf env b a)   -- Contravariance for parameter type
     (isSubOf env as bs) -- Covariance for return type
 
-isSubOf env (Prod a as) (Prod b bs) = (&&)
-    (isSubOf env a b)
-    (isSubOf env as bs)
+isSubOf env (Tuple arr1) (Tuple arr2) 
+    | length arr1 > length arr2 = False -- RuleWide
+    | otherwise = and $ do
+        i <- indices arr1
+        return $ isSubOf env (arr1 ! i) (arr2 ! i)
+
 
 isSubOf _ _ _ = False
 

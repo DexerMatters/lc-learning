@@ -1,5 +1,5 @@
 module Context(indexProc) where
-import Lexing (Term(TmAbs, TmAbsC, TmAs, TmAsC, TmApp, TmProd, TmIfElse, TmProj), FITerm, TyTerm (..), FI)
+import Lexing (Term(..), FITerm, TyTerm (..), FI)
 import Utils.EvalEnv (EvalState, Ty (..), flow)
 import Typing (lookupType)
 
@@ -13,9 +13,7 @@ import Typing (lookupType)
 tyTermToTy :: FI -> TyTerm -> EvalState FITerm Ty
 tyTermToTy fi (TmSiT s) = Si <$> lookupType fi s
 
-tyTermToTy fi (TmProdT t1 t2) = Prod 
-    <$> tyTermToTy fi t1 
-    <*> tyTermToTy fi t2
+tyTermToTy fi (TmTupleT arr) = Tuple <$> tyTermToTy fi `mapM` arr
 
 tyTermToTy fi (TmAbsT t1 t2) = Abs 
     <$> tyTermToTy fi t1 
@@ -37,10 +35,9 @@ indexProc' (fi, TmApp t1 t2) = do
     t2' <- indexProc' t2
     return (fi, TmApp t1' t2')
 
-indexProc' (fi, TmProd t1 t2) = do
-    t1' <- indexProc' t1
-    t2' <- indexProc' t2
-    return (fi, TmProd t1' t2')
+indexProc' (fi, TmTuple ts) = do
+    ts' <- indexProc' `mapM` ts
+    return (fi, TmTuple ts')
 
 indexProc' (fi, TmProj t i) = do
     t' <- indexProc' t

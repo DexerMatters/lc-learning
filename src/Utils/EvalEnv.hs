@@ -25,17 +25,18 @@ import Data.Graph (Graph)
 import Text.Printf (printf)
 import Data.Bool (bool)
 import Debug.Trace (trace)
+import GHC.Arr (Array, elems)
 
 type FI = (Int, Int)
 
-data Ty = Si Int | Prod Ty Ty | Abs Ty Ty deriving Eq
+data Ty = Si Int | Tuple (Array Int Ty) | Abs Ty Ty deriving Eq
 
 trivalFI :: FI
 trivalFI = (0, 0)
 
 instance Show Ty where
   show (Si i) = printf "#%d" i
-  show (Prod t1 t2) = "(" ++ show t1 ++ "," ++ show t2 ++ ")"
+  show (Tuple arr) = show (elems arr)
   show (Abs t1 t2)  = show t1 ++ "->" ++ show t2
 
 data EvalError = 
@@ -45,7 +46,7 @@ data EvalError =
     | UnboundVariable   FI String
     | UndefinedBehavior FI
     | PatternBadMatched FI
-    | ProjOutOfBound    FI
+    | ProjOutOfBound    FI Int Int
 
     | InternalError
     | EndOfEval
