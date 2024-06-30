@@ -15,6 +15,8 @@ tyTermToTy fi (TmSiT s) = Si <$> lookupType fi s
 
 tyTermToTy fi (TmTupleT arr) = Tuple <$> tyTermToTy fi `mapM` arr
 
+tyTermToTy fi (TmRecordT m) = Record <$> tyTermToTy fi `mapM` m
+
 tyTermToTy fi (TmAbsT t1 t2) = Abs 
     <$> tyTermToTy fi t1 
     <*> tyTermToTy fi t2
@@ -42,6 +44,14 @@ indexProc' (fi, TmTuple ts) = do
 indexProc' (fi, TmProj t i) = do
     t' <- indexProc' t
     return (fi, TmProj t' i)
+
+indexProc' (fi, TmRecord m) = do
+    ts' <- indexProc' `mapM` m
+    return (fi, TmRecord ts')
+
+indexProc' (fi, TmRcdProj t s) = do
+    t' <- indexProc' t
+    return (fi, TmRcdProj t' s)
 
 indexProc' (fi, TmIfElse t1 t2 t3) = do
     t1' <- indexProc' t1

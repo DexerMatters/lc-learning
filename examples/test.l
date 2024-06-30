@@ -1,1 +1,2 @@
-λ(x, _, z, _):(Bool, Int, Top, Bot).(x, z)
+let get:Int -> Int = (λa:Int.a) in
+get

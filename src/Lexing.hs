@@ -7,7 +7,6 @@ module Lexing(
     , FI
     , Ground(..)
     , Typing
-    , rev
     , pVar
     , pAs
     , pLitBool
@@ -19,14 +18,16 @@ module Lexing(
     ) where
 
 import Data.Void
-import Text.Megaparsec hiding (State)
+import Text.Megaparsec hiding (sepBy, State)
 import Text.Megaparsec.Char (letterChar, alphaNumChar, space1, upperChar, digitChar, spaceChar, space, newline, char)
 
 import qualified Text.Megaparsec.Char.Lexer as L
-import Control.Monad (liftM3, liftM4)
+import Control.Monad (liftM3, liftM4, guard)
 import Prelude hiding (lex)
 import Utils.EvalEnv (Ty)
 import GHC.Arr (Array, listArray)
+import Data.Map (Map, fromList)
+import Debug.Trace (trace)
 
 type Parser = Parsec Void String
 type Typing = String
@@ -41,8 +42,13 @@ data Term =
     | TmAs      FITerm TyTerm               -- :: Term : Type
     | TmIfElse  FITerm FITerm FITerm        -- :: if Term then Term else Term
     | TmLetIn   PtTerm TyTerm FITerm FITerm -- :: let λPattern : Type = Term in Term
-    | TmTuple   (Array Int FITerm)          -- :: (Term, Term)
-    | TmProj    FITerm Int                  -- :: Term.Index
+
+
+    | TmTuple   (Array Int FITerm)          -- :: (Term, Term, ...)
+    | TmProj    FITerm Int                  -- :: Term[Index]
+
+    | TmRecord  (Map String FITerm)         -- :: {label_1: Term, label_2: Term, ...}
+    | TmRcdProj FITerm String               -- :: Term.label
 
     -- for contexting
     | TmAbsC    PtTerm Ty FITerm
@@ -55,13 +61,15 @@ data Term =
     deriving Show
 
 data TyTerm =
-      TmAbsT   TyTerm TyTerm
-    | TmTupleT (Array Int TyTerm)
-    | TmSiT    String
+      TmAbsT    TyTerm TyTerm
+    | TmTupleT  (Array Int TyTerm)
+    | TmRecordT (Map String TyTerm)
+    | TmSiT     String
     deriving Show
 
 data PtTerm =
-      TmTupleP (Array Int PtTerm)
+      TmTupleP  (Array Int PtTerm)
+    | TmRecordP (Map String PtTerm)
     | TmSiP    String
     deriving Show
 
@@ -99,19 +107,11 @@ var = lexeme $ (:)
 ty :: Parser String
 ty = lexeme $ (:) <$> upperChar <*> many alphaNumChar
 
-rev :: Parser a -> Parser a
-rev p = do
-    o  <- getOffset
-    s' <- endWith p
-    r  <- p
-    setInput s'
-    setOffset o
-    return r
-
-endWith :: Parser a -> Parser String
-endWith p =
-        try (do {_ <- lookAhead (p *> many spaceChar *> eof); return []})
-    <|> (do {x <- anySingle; xs <- endWith p; return (x:xs)})
+sepBy :: Parser a -> Parser sep -> Parser [a]
+sepBy a sep = do 
+    arr <- sepBy1 a sep
+    guard (length arr > 1)
+    return arr
 
 fi :: Parser Term -> Parser FITerm
 fi p = do
@@ -136,11 +136,17 @@ ptTuple = do
     arr <- scope '(' ')' (sepBy1 (ptSig 0) (symbol ","))
     return $ TmTupleT $ listArray (0, length arr - 1) arr
 
+ptRecord :: Parser TyTerm
+ptRecord = do
+    arr <- scope '{' '}' (sepBy1 eq (symbol ","))
+    return $ TmRecordT $ fromList arr
+    where eq = (,) <$> var <*> (symbol ":" *> ptSig 0)
+
 ptSi :: Parser TyTerm
 ptSi = TmSiT <$> ty
 
 ptSig :: Int -> Parser TyTerm
-ptSig i = choice . drop i $ [try ptAbs, ptTuple, ptSi]
+ptSig i = choice . drop i $ [try ptAbs, ptTuple, ptRecord, ptSi]
 
 -- Implementions for pattern expression parsing
 
@@ -149,11 +155,17 @@ ppTuple = do
     arr <- scope '(' ')' (sepBy1 (ppSig 0) (symbol ","))
     return $ TmTupleP $ listArray (0, length arr - 1) arr
 
+ppRecord :: Parser PtTerm
+ppRecord = do
+    arr <- scope '{' '}' (sepBy1 eq (symbol ","))
+    return $ TmRecordP $ fromList arr
+    where eq = (,) <$> var <*> (symbol "=" *> ppSig 0)
+
 ppSi :: Parser PtTerm
 ppSi = TmSiP <$> var
 
 ppSig :: Int -> Parser PtTerm
-ppSig i = choice . drop i $ [ppTuple, ppSi]
+ppSig i = choice . drop i $ [ppTuple, ppRecord, ppSi]
 
 -- Implementions for token parsing
 
@@ -206,13 +218,24 @@ pSubDef = TmSubDef
 
 pTuple :: Parser Term
 pTuple = do
-    arr <- scope '(' ')' (sepBy1 (pTerm 0) (symbol ","))
+    arr <- scope '(' ')' (sepBy (pTerm 0) (symbol ","))
     return $ TmTuple $ listArray (0, length arr - 1) arr
 
 pProj :: Parser Term
 pProj = TmProj
-    <$> (pTerm 4 <|> pParen)
+    <$> (pTerm 5 <|> pParen)
     <*> scope '[' ']' (read <$> some digitChar)
+
+pRecord :: Parser Term
+pRecord = do
+    arr <- scope '{' '}' (sepBy1 eq (symbol ","))
+    return $ TmRecord $ fromList arr
+    where eq = (,) <$> var <*> (symbol "=" *> pTerm 0)
+
+pRcdProj :: Parser Term
+pRcdProj = TmRcdProj 
+    <$> (pTerm 4 <|> pParen)
+    <*> (symbol "." *> var)
 
 pParen :: Parser FITerm
 pParen = scope '(' ')' . pTerm $ 0
@@ -232,9 +255,11 @@ pTerm i = choice . drop (i + 3) $
         -- Operators
       , try pApp
       , try pAs
+      , try pRcdProj
       , try pProj
 
         -- Atomics
+      , pRecord
       , pTuple
       , pAbs
       , pLitBool

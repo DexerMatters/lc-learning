@@ -26,10 +26,15 @@ import Text.Printf (printf)
 import Data.Bool (bool)
 import Debug.Trace (trace)
 import GHC.Arr (Array, elems)
+import Data.Map (Map, toList)
 
 type FI = (Int, Int)
 
-data Ty = Si Int | Tuple (Array Int Ty) | Abs Ty Ty deriving Eq
+data Ty = 
+      Si Int 
+    | Tuple (Array Int Ty) 
+    | Record (Map String Ty)
+    | Abs Ty Ty deriving Eq
 
 trivalFI :: FI
 trivalFI = (0, 0)
@@ -37,6 +42,7 @@ trivalFI = (0, 0)
 instance Show Ty where
   show (Si i) = printf "#%d" i
   show (Tuple arr) = show (elems arr)
+  show (Record m) = show (toList m)
   show (Abs t1 t2)  = show t1 ++ "->" ++ show t2
 
 data EvalError = 
@@ -47,6 +53,7 @@ data EvalError =
     | UndefinedBehavior FI
     | PatternBadMatched FI
     | ProjOutOfBound    FI Int Int
+    | LabelNotFound     FI String
 
     | InternalError
     | EndOfEval

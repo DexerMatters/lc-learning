@@ -10,6 +10,8 @@ import Subtyping (subs, notSubs)
 import Data.Bool (bool)
 import Control.Monad (liftM2, join)
 import GHC.Arr
+import Data.Map (member, keys)
+import qualified Data.Map ((!))
 
 typeof' :: FITerm -> EvalState FITerm Ty
 typeof' (fi, TmLit (GBool _)) = returnSi fi "Bool"
@@ -41,6 +43,15 @@ typeof' (fi, TmProj t i) = typeof' t  >>= \case
         then return (arr ! i)
         else throwError [ProjOutOfBound fi (length arr - 1) i]
     d -> throwError [BadTypedS fi d "Tuple Type"]
+
+typeof' (_, TmRecord m) = Record <$> typeof' `mapM` m
+
+typeof' (fi, TmRcdProj t l) = typeof' t  >>= \case
+    (Record m) ->
+        if   member l m
+        then return (m Data.Map.! l)
+        else throwError [LabelNotFound fi l]
+    d -> throwError [BadTypedS fi d "Record Type"]
 
 typeof' (fi, TmIfElse t1 t2 t3) = do
     ty1 <- typeof' t1
@@ -85,6 +96,14 @@ dePattern fi (TmTupleP ts) (Tuple tys)
         do
             i <- indices ts
             return (ts ! i, tys ! i))
+    where f (ts', tys') = dePattern fi ts' tys'
+
+dePattern fi (TmRecordP tm) (Record tym)
+    | length tm /= length tym = throwError [PatternBadMatched fi]
+    | otherwise = join <$> mapM f (
+        do
+            l <- keys tm
+            return (tm Data.Map.! l, tym Data.Map.! l))
     where f (ts', tys') = dePattern fi ts' tys'
 
 dePattern fi _ _ = throwError [PatternBadMatched fi]
