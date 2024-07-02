@@ -22,7 +22,7 @@ import Text.Megaparsec hiding (sepBy, State)
 import Text.Megaparsec.Char (letterChar, alphaNumChar, space1, upperChar, digitChar, spaceChar, space, newline, char)
 
 import qualified Text.Megaparsec.Char.Lexer as L
-import Control.Monad (liftM3, liftM4, guard)
+import Control.Monad (liftM3, liftM4)
 import Prelude hiding (lex)
 import Utils.EvalEnv (Ty)
 import GHC.Arr (Array, listArray)
@@ -106,12 +106,6 @@ var = lexeme $ (:)
 
 ty :: Parser String
 ty = lexeme $ (:) <$> upperChar <*> many alphaNumChar
-
-sepBy :: Parser a -> Parser sep -> Parser [a]
-sepBy a sep = do 
-    arr <- sepBy1 a sep
-    guard (length arr > 1)
-    return arr
 
 fi :: Parser Term -> Parser FITerm
 fi p = do
@@ -218,7 +212,7 @@ pSubDef = TmSubDef
 
 pTuple :: Parser Term
 pTuple = do
-    arr <- scope '(' ')' (sepBy (pTerm 0) (symbol ","))
+    arr <- scope '(' ')' (sepBy1 (pTerm 0) (symbol ","))
     return $ TmTuple $ listArray (0, length arr - 1) arr
 
 pProj :: Parser Term

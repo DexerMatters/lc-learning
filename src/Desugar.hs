@@ -1,6 +1,7 @@
 module Desugar(desugarProc) where
 import Lexing
 import Utils.EvalEnv
+import GHC.Arr ((!))
 
 desugarProc' :: FITerm -> EvalState FITerm FITerm
 desugarProc' (fi, TmAbs s ty t) = do
@@ -18,7 +19,9 @@ desugarProc' (fi, TmApp t1 t2) = do
 
 desugarProc' (fi, TmTuple arr) = do
     arr' <- desugarProc' `mapM` arr
-    return (fi, TmTuple arr')
+    if   length arr' > 1 
+    then return (fi, TmTuple arr')
+    else return (arr' ! 0)
 
 desugarProc' (fi, TmProj t i) = do
     t' <- desugarProc' t
